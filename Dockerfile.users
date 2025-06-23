@@ -1,0 +1,15 @@
+FROM ubuntu:22.04
+
+RUN apt-get update && \
+    apt-get install -y sudo curl wget bash net-tools acl rsync mysql-client vim nano
+
+RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq && \
+    chmod +x /usr/local/bin/yq
+
+COPY script/ /usr/local/bin/
+
+RUN chmod +x /usr/local/bin/*
+
+VOLUME ["/storage"]
+
+CMD ["/usr/local/bin/excecute.sh"]

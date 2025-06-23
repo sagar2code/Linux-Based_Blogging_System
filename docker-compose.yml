@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  users:
+    build:
+      context: .
+      dockerfile: Dockerfile.users
+    volumes:
+      - home_data:/home
+      - storage_data:/storage
+    networks:
+      - backend
+      - frontend
+
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    environment:
+      MYSQL_DATABASE: blogsys
+      MYSQL_USER: blog_user
+      MYSQL_PASSWORD: blogpass
+
+    volumes:
+      - home_data:/home:ro
+      - db_data:/var/lib/mysql
+    networks:
+      - backend
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - users
+    volumes:
+      - home_data:/home:ro
+      - ./update_scripts:/update_scripts
+    networks:
+      - frontend
+
+volumes:
+  home_data:
+  db_data:
+  storage_data:
+networks:
+  backend:
+  frontend:
+   
+
+
