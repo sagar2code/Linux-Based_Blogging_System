@@ -1,7 +1,5 @@
 FROM mysql:8.0.36-debian
 
-RUN apt-get update && \
-    apt-get install -y bash mysql-client 
 
 ENV MYSQL_DATABASE=blogsys \
     MYSQL_ROOT_PASSWORD=rootpass \

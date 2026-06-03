@@ -16,7 +16,7 @@ declare -A category_map=(
     [7]="Finance"
 )
 
-REPORT="/home/admins/$USER/blog_report_$(date +%Y%m%d).txt"
+REPORT="/home/admins/${USER}/blog_report_$(date +%Y%m%d).txt"
 echo "Blog Report - $(date)" > "$REPORT"
 echo "----------------------------------" >> "$REPORT"
 
