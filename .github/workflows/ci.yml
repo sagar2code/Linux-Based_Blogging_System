@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build all Docker images
+        run: docker compose build
+
+      - name: Start containers
+        run: docker compose up -d
+
+      - name: Wait for containers to initialize
+        run: sleep 15
+
+      - name: Check users container is running
+        run: |
+          if ! docker compose ps users | grep -q "Up"; then
+            echo "FAIL: users container is not running"
+            docker compose logs users
+            exit 1
+          fi
+          echo "PASS: users container is up"
+
+      - name: Check db container is running
+        run: |
+          if ! docker compose ps db | grep -q "Up"; then
+            echo "FAIL: db container is not running"
+            docker compose logs db
+            exit 1
+          fi
+          echo "PASS: db container is up"
+
+      - name: Check nginx container is running
+        run: |
+          if ! docker compose ps nginx | grep -q "Up"; then
+            echo "FAIL: nginx container is not running"
+            docker compose logs nginx
+            exit 1
+          fi
+          echo "PASS: nginx container is up"
+
+      - name: Check MySQL is responding
+        run: |
+          if ! docker compose exec -T db mysql -u blog_user -pblogpass -e "SELECT 1;" blogsys > /dev/null 2>&1; then
+            echo "FAIL: MySQL not responding"
+            exit 1
+          fi
+          echo "PASS: MySQL is up"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+      - name: Push images to Docker Hub
+        if: success()
+        run: |
+          docker tag linux-based_blogging_system-users ${{ secrets.DOCKERHUB_USERNAME }}/blog-users:latest
+          docker tag linux-based_blogging_system-nginx ${{ secrets.DOCKERHUB_USERNAME }}/blog-nginx:latest
+          docker tag linux-based_blogging_system-db ${{ secrets.DOCKERHUB_USERNAME }}/blog-db:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/blog-users:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/blog-nginx:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/blog-db:latest
