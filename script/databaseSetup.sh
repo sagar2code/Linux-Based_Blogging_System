@@ -24,4 +24,3 @@ done
 
 echo "--------All author tables created.--------"
 
-tail -f /dev/null

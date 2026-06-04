@@ -1,16 +1,22 @@
-
-
 services:
   users:
     build:
       context: .
       dockerfile: Dockerfile.users
+    ports:
+      - "2222:22"
     volumes:
       - home_data:/home
       - storage_data:/storage
     networks:
       - backend
       - frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+          pids: 100
 
   db:
     build:
@@ -20,12 +26,17 @@ services:
       MYSQL_DATABASE: blogsys
       MYSQL_USER: blog_user
       MYSQL_PASSWORD: blogpass
-
     volumes:
       - home_data:/home:ro
       - db_data:/var/lib/mysql
     networks:
       - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+          pids: 200
 
   nginx:
     build:
@@ -40,14 +51,18 @@ services:
       - ./update_scripts:/update_scripts
     networks:
       - frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+          pids: 50
 
 volumes:
   home_data:
   db_data:
   storage_data:
+
 networks:
   backend:
   frontend:
-   
-
-
