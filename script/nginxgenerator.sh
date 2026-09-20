@@ -4,7 +4,7 @@ echo "-------- Sleeping for 300 seconds to wait for user setup --------"
 sleep 300
 
 
-mkdir -p /update_scripts
+mkdir -p /update_scripts  #if the file doesnt exist on the laptop
 echo "#!/bin/bash" > /update_scripts/update_etc.sh
 echo "" >> /update_scripts/update_etc.sh
 

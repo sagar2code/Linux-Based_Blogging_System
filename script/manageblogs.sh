@@ -13,22 +13,30 @@ DB_PASS="blogpass"
 DB_NAME="blogsys"
 TABLE="${author_name}_blogs"
 
-execute_sql() {
-  query="$1"
-  mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" -e "$query" 2>/dev/null
 
+execute_sql_prepared() {
+  local stmt="$1"
+  mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
+    --execute="$stmt" 2>/dev/null
+}
+
+sanitize() {
+  # Escape single quotes by doubling them (SQL standard)
+  printf '%s' "$1" | sed "s/'/''/g"
 }
 
 
-# PLEASE IGNORE THE SPELLING OF AUTHOR
+#hello'); DROP TABLE author_blogs; -- 
+
+# INSERT INTO author_blogs (filename, publish_status, cat_order)
+#VALUES ('hello'); DROP TABLE author_blogs; -- ', 'TRUE', '1,2');
 
 BLOGS_DIR="/home/authors/$author_name/blogs"
 AUTHOURS_DIR="/home/authors/$author_name"
 PUBLIC_DIR="/home/authors/$author_name/public"
 
-       
-        if [ ! -f "$AUTHOURS_DIR/blogs.yaml" ]; then
-            cat > "$AUTHOURS_DIR/blogs.yaml" << 'EOF'
+if [ ! -f "$AUTHOURS_DIR/blogs.yaml" ]; then
+    cat > "$AUTHOURS_DIR/blogs.yaml" << 'EOF'
 categories:
   1: "Sports"
   2: "Cinema"
@@ -40,13 +48,12 @@ categories:
 blogs: []
 
 EOF
-            chown "$author_name:$author_name" "$AUTHOURS_DIR/blogs.yaml"
-         
-          
-        fi
+    chown "$author_name:$author_name" "$AUTHOURS_DIR/blogs.yaml"
+fi
 
 publish_article() {
     filename="$1"
+
     if [ ! -f "${BLOGS_DIR}/${filename}" ]; then
         echo "Error: Article ${filename} does not exist in your blogs directory."
         exit 1
@@ -62,6 +69,9 @@ publish_article() {
 
     echo -n "Enter preferred category order (comma-separated numbers, e.g., 2,1,3): "
     read -r category_order
+
+    
+
     categories=($(echo "$category_order" | tr ',' ' '))
     for i in "${categories[@]}"; do
         if [ "$i" -lt 1 ] || [ "$i" -gt 7 ]; then
@@ -69,7 +79,7 @@ publish_article() {
             exit 1
         fi
     done
-   
+
     tmp_file="/tmp/${author_name}_blogs.yaml"
     yq eval ".blogs += [{
       \"file_name\": \"$filename\",
@@ -78,22 +88,25 @@ publish_article() {
     }]" "$AUTHOURS_DIR/blogs.yaml" > "$tmp_file"
     rsync -a --inplace "$tmp_file" "$AUTHOURS_DIR/blogs.yaml"
     rm "$tmp_file"
-    
-    escaped_order=$(echo "$category_order")
-     query="
-    INSERT INTO $TABLE (filename, publish_status, cat_order)
-    VALUES ('$filename', 'TRUE', '$escaped_order')
-    ON DUPLICATE KEY UPDATE publish_status='TRUE', cat_order='$escaped_order';"
-    execute_sql "$query"
-   
-    ln -sf "${BLOGS_DIR}/${filename}" "${PUBLIC_DIR}/${filename}" 
-    echo "$filename is published" 
+
+    safe_filename=$(sanitize "$filename")
+    safe_order=$(sanitize "$category_order")
+    query="INSERT INTO \`${TABLE}\` (filename, publish_status, cat_order)
+           VALUES ('${safe_filename}', 'TRUE', '${safe_order}')
+           ON DUPLICATE KEY UPDATE publish_status='TRUE', cat_order='${safe_order}';"
+    execute_sql_prepared "$query"
+
+    ln -sf "${BLOGS_DIR}/${filename}" "${PUBLIC_DIR}/${filename}"
+    echo "$filename is published"
 }
 
 archive_article() {
     filename="$1"
+
+    
+
     if ! yq e ".blogs[] | select(.file_name == \"$filename\")" "$AUTHOURS_DIR/blogs.yaml" >/dev/null; then
-        echo "Error: Article $filename not found in metadata"   
+        echo "Error: Article $filename not found in metadata"
         exit 1
     fi
 
@@ -106,12 +119,10 @@ archive_article() {
     yq e "(.blogs[] | select(.file_name == \"$filename\").publish_status) = false" "$AUTHOURS_DIR/blogs.yaml" > "$tmp_file"
     rsync -a --inplace "$tmp_file" "$AUTHOURS_DIR/blogs.yaml"
     rm "$tmp_file"
-    
-    
-    query="UPDATE $TABLE 
-          SET publish_status='FALSE' 
-          WHERE filename='$filename';"
-    execute_sql "$query"
+
+    safe_filename=$(sanitize "$filename")
+    query="UPDATE \`${TABLE}\` SET publish_status='FALSE' WHERE filename='${safe_filename}';"
+    execute_sql_prepared "$query"
 
     rm -f "${PUBLIC_DIR}/${filename}"
     echo "Archived $filename"
@@ -119,8 +130,10 @@ archive_article() {
 
 delete_article() {
     filename="$1"
+
+    
     if ! yq e ".blogs[] | select(.file_name == \"$filename\")" "$AUTHOURS_DIR/blogs.yaml" >/dev/null; then
-        echo "Error: Article $filename not found in metadata"   
+        echo "Error: Article $filename not found in metadata"
         exit 1
     fi
 
@@ -139,11 +152,11 @@ delete_article() {
     yq e "del(.blogs[] | select(.file_name == \"$filename\"))" "$AUTHOURS_DIR/blogs.yaml" > "$tmp_file"
     rsync -a --inplace "$tmp_file" "$AUTHOURS_DIR/blogs.yaml"
     rm "$tmp_file"
-    
-      query="DELETE FROM $TABLE 
-           WHERE filename='$filename';"
-     execute_sql "$query"
-    
+
+    safe_filename=$(sanitize "$filename")
+    query="DELETE FROM \`${TABLE}\` WHERE filename='${safe_filename}';"
+    execute_sql_prepared "$query"
+
     rm -f "${BLOGS_DIR}/${filename}"
     rm -f "${PUBLIC_DIR}/${filename}"
 
@@ -152,8 +165,10 @@ delete_article() {
 
 edit_article() {
     filename="$1"
+
+
     if ! yq e ".blogs[] | select(.file_name == \"$filename\")" "$AUTHOURS_DIR/blogs.yaml" >/dev/null; then
-        echo "Error: Article $filename not found in metadata" 
+        echo "Error: Article $filename not found in metadata"
         exit 1
     fi
 
@@ -165,6 +180,9 @@ edit_article() {
     yq e -o=props '.categories' "$AUTHOURS_DIR/blogs.yaml"
     echo -n "Enter new category order (comma-separated numbers):(eg 2,1,3) "
     read -r new_order
+
+    
+
     categories=($(echo "$new_order" | tr ',' ' '))
     for i in "${categories[@]}"; do
         if [ "$i" -lt 1 ] || [ "$i" -gt 7 ]; then
@@ -173,35 +191,24 @@ edit_article() {
         fi
     done
 
-    escaped_order=$(echo "$new_order")
-
     tmp_file="/tmp/${author_name}_blogs.yaml"
     yq e "(.blogs[] | select(.file_name == \"$filename\").cat_order) = [$new_order]" "$AUTHOURS_DIR/blogs.yaml" > "$tmp_file"
     rsync -a --inplace "$tmp_file" "$AUTHOURS_DIR/blogs.yaml"
     rm "$tmp_file"
 
-   query="UPDATE $TABLE 
-       SET cat_order='$escaped_order' 
-       WHERE filename='$filename';"
-  execute_sql "$query"
+    safe_filename=$(sanitize "$filename")
+    safe_order=$(sanitize "$new_order")
+    query="UPDATE \`${TABLE}\` SET cat_order='${safe_order}' WHERE filename='${safe_filename}';"
+    execute_sql_prepared "$query"
 
     echo "Updated categories for $filename"
 }
 
-# MAIN SCRIPT
 case "$1" in
-    -p)
-        publish_article "$2"
-        ;;
-    -a)
-        archive_article "$2"
-        ;;
-    -d)
-        delete_article "$2"
-        ;;
-    -e)
-        edit_article "$2"
-        ;;
+    -p) publish_article "$2" ;;
+    -a) archive_article "$2" ;;
+    -d) delete_article "$2" ;;
+    -e) edit_article "$2" ;;
     *)
         echo "Usage:  { -p | -a | -d | -e } <filename>"
         echo "Options:"
@@ -212,6 +219,7 @@ case "$1" in
         exit 1
         ;;
 esac
+
 
 
 

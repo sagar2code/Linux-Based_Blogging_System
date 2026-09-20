@@ -7,9 +7,9 @@ then
 fi
 
 
-[ -f /storage/passwd ] && cp /storage/passwd /etc/passwd
-[ -f /storage/shadow ] && cp /storage/shadow /etc/shadow
-[ -f /storage/group ]  && cp /storage/group  /etc/group
+[ -f /storage/passwd ] && cp -a /storage/passwd /etc/passwd
+[ -f /storage/shadow ] && cp -a /storage/shadow /etc/shadow
+[ -f /storage/group ]  && cp -a /storage/group  /etc/group
 
 
 YAML_FILE=$1
@@ -53,7 +53,7 @@ create_user() {
         return
     fi
 
-    useradd -m -d "/home/${user_type}s/${username}" -s /bin/bash -G "g_$user_type" "$username"
+    useradd -d "/home/${user_type}s/${username}" -s /bin/bash -G "g_$user_type" "$username"
     echo "$username:DeltaInductions" | chpasswd
     chage -d 0 "$username"
     
@@ -66,21 +66,25 @@ create_user() {
         chmod 755 "/home/authors/$username/public"
 
 
+
         ;;
     mod)
         mkdir -p "/home/mods/$username"/managed_authors
         chown -R "$username:$username" "/home/mods/$username"
         chmod 750 "/home/mods/$username"
+
         ;;
     user)
         mkdir -p "/home/users/$username"/all_blogs
         chown -R "$username:$username" "/home/users/$username"
         chmod 750 "/home/users/$username"
+
         ;;
     admin)
         mkdir -p "/home/admins/$username"
         chown -R "$username:$username" "/home/admins/$username"
         chmod 700 "/home/admins/$username"
+
         ;;
     *)
         echo "Error: Invalid user type '$user_type'" >&2
@@ -152,7 +156,6 @@ user_count=$(yq e '.users | length' "$YAML_FILE")
 for ((i=0; i<user_count; i++)); do
     username=$(yq e ".users[$i].username" "$YAML_FILE")
     
-    rm -f "/home/users/$username/all_blogs"/*
     
  
     author_count=$(yq e '.authors | length' "$YAML_FILE")
@@ -207,7 +210,6 @@ for ((i=0; i<admin_count; i++)); do
 done
 
 
-#THIS IS FOR THE FIFTH SUBTASK (AdminPanel)
 
 
 LOG_FILE="/var/log/blog_reads.log"
@@ -225,7 +227,7 @@ for ((i=0; i<author_count; i++)); do
     author=$(yq e ".authors[$i].username" "$YAML_FILE")
     setfacl -m u:"$author":rw "$LOG_FILE"
 done
-
+""
 admin_count=$(yq e '.admins | length' "$YAML_FILE")
 for ((i=0; i<admin_count; i++)); do
     admin=$(yq e ".admins[$i].username" "$YAML_FILE")
@@ -262,9 +264,9 @@ done
 
 mkdir -p "/storage"
 
-cp /etc/passwd /storage/passwd
-cp /etc/shadow /storage/shadow
-cp /etc/group  /storage/group
+cp -a /etc/passwd /storage/passwd
+cp -a /etc/shadow /storage/shadow
+cp -a /etc/group  /storage/group
 
 
 echo "User setup completed successfully."

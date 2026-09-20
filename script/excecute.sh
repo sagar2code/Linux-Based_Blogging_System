@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # Exit immediately if a command exits with a non-zero status
+
 
 # 1. Provision users first while the system is quiet
 echo "-------- Provisioning Linux users --------"

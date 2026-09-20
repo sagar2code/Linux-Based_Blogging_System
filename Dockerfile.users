@@ -1,28 +1,18 @@
 FROM ubuntu:22.04
 
-RUN apt-get update && \
-    apt-get install -y sudo curl wget bash net-tools acl rsync mysql-client vim nano
+		
+RUN apt-get update && apt-get install -y sudo curl wget bash net-tools acl rsync mysql-client openssh-server vim nano && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq && \
-    chmod +x /usr/local/bin/yq
+RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
+    -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq
 
 COPY script/ /usr/local/bin/
-
 RUN chmod +x /usr/local/bin/*
 
-RUN apt-get update && apt-get install -y openssh-server mysql-client && rm -rf /var/lib/apt/lists/*
-
-# Set up SSH directory requirements
 RUN mkdir -p /var/run/sshd
-
-# Clean up the password auth config edits (combining into one clean line)
 RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-
-# Ensure host keys are generated at build time
 RUN ssh-keygen -A
 
 EXPOSE 22
-
 VOLUME ["/storage"]
-
 CMD ["/usr/local/bin/excecute.sh"]

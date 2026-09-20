@@ -11,6 +11,11 @@ services:
     networks:
       - backend
       - frontend
+    env_file:
+      - .env
+    depends_on:	
+      db:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -22,15 +27,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.db
-    environment:
-      MYSQL_DATABASE: blogsys
-      MYSQL_USER: blog_user
-      MYSQL_PASSWORD: blogpass
+    env_file:
+      - .env
     volumes:
       - home_data:/home:ro
       - db_data:/var/lib/mysql
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost",
+             "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     deploy:
       resources:
         limits:
